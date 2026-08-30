@@ -1,0 +1,9 @@
+node_modules/
+dist/
+work/
+.env
+.env.*
+!.env.example
+students.json
+student-credentials.json
+*-credentials.json
