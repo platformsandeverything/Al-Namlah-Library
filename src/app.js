@@ -85,4 +85,19 @@ function accountsView(){const users=[...state.profiles].sort((a,b)=>a.name.local
 function bindAccounts(){const b=$('#addAccountBtn');if(b)b.onclick=showAccountModal}
 function showAccountModal(){document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="accountOverlay"><form class="modal" id="accountForm"><h3>إضافة حساب جديد</h3><p>اختر الدور وأدخل الاسم ورقم الجوال، وسيُنشأ باسورد مؤقت تلقائيًا.</p><div class="form"><div class="field"><label>الاسم الكامل</label><input name="name" required></div><div class="field"><label>رقم الجوال</label><input name="phone" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" required></div><div class="field"><label>نوع الحساب</label><select name="role" required><option value="student">طالب</option><option value="admin">مشرف</option></select></div><div class="modal-actions"><button type="button" class="btn ghost" id="cancelAccount">إلغاء</button><button class="btn">إنشاء الحساب</button></div></div></form></div>`);$('#cancelAccount').onclick=closeAccountModal;$('#accountOverlay').onclick=e=>{if(e.target.id==='accountOverlay')closeAccountModal()};$('#accountForm').onsubmit=createAccount}
 function closeAccountModal(){document.querySelector('#accountOverlay')?.remove()}
-async function createAccount(e){e.preventDefault();const form=e.currentTarget,button=form.querySelector('button[type="submit"],button:not([type])'),fd=new FormData(form);button.disabled=true;button.textContent='جارٍ الإنشاء...';let data,error;if(supabase)({data,error}=await supabase.functions.invoke('admin-create-user',{body:{name:fd.get('name'),phone:fd.get('phone'),role:fd.get('role')}}));else data={name:fd.get('name'),phone:normalizePhone(fd.get('phone')).replace('+966','0'),role:fd.get('role'),temporary_password:'Nm!Demo12345'};if(error||data?.error){button.disabled=false;button.textContent='إنشاء الحساب';return toast(data?.error||'تعذر إنشاء الحساب')}await loadData();form.innerHTML=`<h3>تم إنشاء الحساب بنجاح</h3><p>أرسل هذه البيانات إلى ${esc(data.name)}. سيُطلب منه تغيير الباسورد عند أول دخول.</p><div class="notice">احفظ الباسورد الآن؛ لن يظهر مرة أخرى.</div><div class="form"><div class="field"><label>رقم الجوال</label><input dir="ltr" readonly value="${esc(data.phone)}"></div><div class="field"><label>الباسورد المؤقت</label><input dir="ltr" readonly value="${esc(data.temporary_password)}"></div><button type="button" class="btn" id="finishAccount">تم الحفظ</button></div>`;$('#finishAccount').onclick=()=>{closeAccountModal();renderPage()}}
+async function createAccount(e){
+  e.preventDefault();
+  const form=e.currentTarget,button=form.querySelector('button[type="submit"],button:not([type])'),fd=new FormData(form);
+  button.disabled=true;button.textContent='جارٍ الإنشاء...';
+  let data,error;
+  if(supabase)({data,error}=await supabase.functions.invoke('admin-create-user',{body:{name:fd.get('name'),phone:fd.get('phone'),role:fd.get('role')}}));
+  else data={name:fd.get('name'),phone:normalizePhone(fd.get('phone')).replace('+966','0'),role:fd.get('role'),temporary_password:'Nm!Demo12345'};
+  if(error||data?.error){
+    let message=data?.error||'تعذر إنشاء الحساب';
+    if(error?.context){try{const details=await error.context.json();message=details?.error||message}catch{}}
+    button.disabled=false;button.textContent='إنشاء الحساب';return toast(message);
+  }
+  await loadData();
+  form.innerHTML=`<h3>تم إنشاء الحساب بنجاح</h3><p>أرسل هذه البيانات إلى ${esc(data.name)}. سيُطلب منه تغيير الباسورد عند أول دخول.</p><div class="notice">احفظ الباسورد الآن؛ لن يظهر مرة أخرى.</div><div class="form"><div class="field"><label>رقم الجوال</label><input dir="ltr" readonly value="${esc(data.phone)}"></div><div class="field"><label>الباسورد المؤقت</label><input dir="ltr" readonly value="${esc(data.temporary_password)}"></div><button type="button" class="btn" id="finishAccount">تم الحفظ</button></div>`;
+  $('#finishAccount').onclick=()=>{closeAccountModal();renderPage()};
+}
