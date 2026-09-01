@@ -31,6 +31,7 @@ const demo={
 };
 let state={user:null,role:null,page:'public',books:[],profiles:[],loans:[],requests:[],reviews:[],modal:null};
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const firstTwoNames=name=>String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).join(' ');
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
 function icon(name){return ({book:'▤',private:'▣',journey:'⌁',rank:'♛',request:'◷',account:'♙',menu:'☰',bell:'♢',plus:'＋'}[name]||'•')}
 
@@ -90,7 +91,11 @@ async function createAccount(e){
   const form=e.currentTarget,button=form.querySelector('button[type="submit"],button:not([type])'),fd=new FormData(form);
   button.disabled=true;button.textContent='جارٍ الإنشاء...';
   let data,error;
-  if(supabase)({data,error}=await supabase.functions.invoke('admin-create-user',{body:{name:fd.get('name'),phone:fd.get('phone'),role:fd.get('role')}}));
+  if(supabase){
+    const {data:{session}}=await supabase.auth.getSession();
+    if(!session){button.disabled=false;button.textContent='إنشاء الحساب';return toast('انتهت جلسة الدخول، سجّل الدخول مرة أخرى')}
+    ({data,error}=await supabase.functions.invoke('admin-create-user',{headers:{Authorization:`Bearer ${session.access_token}`},body:{name:fd.get('name'),phone:fd.get('phone'),role:fd.get('role')}}));
+  }
   else data={name:fd.get('name'),phone:normalizePhone(fd.get('phone')).replace('+966','0'),role:fd.get('role'),temporary_password:'Nm!Demo12345'};
   if(error||data?.error){
     let message=data?.error||'تعذر إنشاء الحساب';
@@ -118,9 +123,9 @@ async function loadData(){
 
 function render(){shell();const loan=pendingReview();if(loan)setTimeout(()=>showReviewModal(loan.id),250)}
 
-function publicView(){const total=state.books.reduce((s,b)=>s+b.quantity,0),loan=pendingReview();return `<div class="hero"><div><h3>أهلاً بك، ${esc(state.user.name.split(' ')[0])} 👋</h3><p>${state.role==='admin'?'أدر كتب الحلقة وتابع حركة الاستعارة من مكان واحد.':'كل صفحة تقرؤها اليوم، تبني بها مستقبلك غدًا.'}</p></div><div class="hero-stats"><div class="hero-stat"><strong>${state.books.length}</strong><span>عنوانًا</span></div><div class="hero-stat"><strong>${total}</strong><span>نسخة متاحة</span></div>${state.role==='student'?`<div class="hero-stat"><strong>${state.user.points}</strong><span>نقطة</span></div>`:''}</div></div>${loan?`<div class="review-prompt"><div><b>أتممت كتابًا، شاركنا رأيك</b><span>قيّمه بعد أن استلمه المشرف.</span></div><button class="btn gold" data-review="${loan.id}">قيّم الكتاب الآن</button></div>`:''}<div class="section-head"><div><h3>كتب الحلقة</h3><p>اضغط على الكتاب لتظهر كل تفاصيله</p></div>${state.role==='admin'?`<button class="btn" data-action="add-book">＋ إضافة كتاب جديد</button>`:''}</div><div class="books-grid">${state.books.map(bookCard).join('')}</div>${reviewsTicker()}`}
+function publicView(){const total=state.books.reduce((s,b)=>s+b.quantity,0),loan=pendingReview();return `<div class="hero"><div><h3>أهلاً بك، ${esc(firstTwoNames(state.user.name))} 👋</h3><p>${state.role==='admin'?'أدر كتب الحلقة وتابع حركة الاستعارة من مكان واحد.':'كل صفحة تقرؤها اليوم، تبني بها مستقبلك غدًا.'}</p></div><div class="hero-stats"><div class="hero-stat"><strong>${state.books.length}</strong><span>عنوانًا</span></div><div class="hero-stat"><strong>${total}</strong><span>نسخة متاحة</span></div>${state.role==='student'?`<div class="hero-stat"><strong>${state.user.points}</strong><span>نقطة</span></div>`:''}</div></div>${loan?`<div class="review-prompt"><div><b>أتممت كتابًا، شاركنا رأيك</b><span>قيّمه بعد أن استلمه المشرف.</span></div><button class="btn gold" data-review="${loan.id}">قيّم الكتاب الآن</button></div>`:''}<div class="section-head"><div><h3>كتب الحلقة</h3><p>اضغط على الكتاب لتظهر كل تفاصيله</p></div>${state.role==='admin'?`<button class="btn" data-action="add-book">＋ إضافة كتاب جديد</button>`:''}</div><div class="books-grid">${state.books.map(bookCard).join('')}</div>${reviewsTicker()}`}
 
-function bookCard(b){const info=ratingInfo(b.id);return `<article class="book-card" data-details="${b.id}">${richCover(b)}<div class="book-info"><span class="category">${esc(b.category||'عام')}</span><h4>${esc(b.title)}</h4><p>${esc(b.author)}</p><div class="rating-summary">${stars(info.average)}<small>${info.count?`${info.average.toFixed(1)} · ${info.count} قيّم`:'لا توجد تقييمات'}</small></div><div class="book-foot"><span class="stock ${b.quantity?'':'out'}">${b.quantity?`${b.quantity} نسخ متاحة`:'غير متوفر'}</span>${state.role==='admin'?`<button class="link-btn" data-edit-book="${b.id}">تعديل</button>`:`<button class="link-btn" data-details="${b.id}">التفاصيل والطلب ←</button>`}</div></div></article>`}
+function bookCard(b){const info=ratingInfo(b.id);return `<article class="book-card" data-details="${b.id}">${richCover(b)}<div class="book-info"><span class="category">${esc(b.category||'عام')}</span><h4>${esc(b.title)}</h4><p>${esc(b.author)}</p><div class="rating-summary">${stars(info.average)}<small>${info.count?`${info.average.toFixed(1)} · ${info.count} قيّم`:'لا توجد تقييمات'}</small></div><div class="book-foot"><span class="stock ${b.quantity?'':'out'}">${b.quantity?`${b.quantity} نسخ متاحة`:'غير متوفر'}</span>${state.role==='admin'?`<span class="book-admin-actions"><button class="link-btn" data-edit-book="${b.id}">تعديل</button><button class="link-btn delete-link" data-delete-book="${b.id}">حذف</button></span>`:`<button class="link-btn" data-details="${b.id}">التفاصيل والطلب ←</button>`}</div></div></article>`}
 
 function reviewsTicker(){if(!state.reviews.length)return '';const cards=state.reviews.map(r=>{const b=state.books.find(x=>x.id==r.book_id),p=state.profiles.find(x=>x.id===r.student_id);return `<article class="review-chip"><div><b>${esc(b?.title||'كتاب')}</b>${stars(r.rating)}</div><p>${r.note?`«${esc(r.note)}»`:'تقييم بدون ملاحظة'}</p><span>${esc(p?.name||'طالب')}</span></article>`}).join('');return `<div class="section-head reviews-head"><div><h3>آراء القرّاء</h3><p>تقييمات طلاب الحلقة بعد إتمام الكتب</p></div></div><div class="reviews-marquee"><div class="reviews-track">${cards}${cards}</div></div>`}
 
@@ -129,6 +134,7 @@ function bindPage(){
   document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>showReviewModal(Number(b.dataset.review)));
   document.querySelectorAll('[data-progress]').forEach(b=>b.onclick=()=>openModal('progress',Number(b.dataset.progress)));
   document.querySelectorAll('[data-edit-book]').forEach(b=>b.onclick=e=>{e.stopPropagation();openModal('book',Number(b.dataset.editBook))});
+  document.querySelectorAll('[data-delete-book]').forEach(b=>b.onclick=e=>{e.stopPropagation();deleteBook(Number(b.dataset.deleteBook))});
   document.querySelectorAll('[data-adjust]').forEach(b=>b.onclick=()=>adjustPoints(b.dataset.adjust,Number(b.dataset.delta)));
   document.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>openModal('target',b.dataset.target));
   document.querySelectorAll('[data-library]').forEach(b=>b.onclick=()=>openModal('library',b.dataset.library));
@@ -136,6 +142,19 @@ function bindPage(){
   document.querySelectorAll('[data-return-loan]').forEach(b=>b.onclick=()=>adminReturnLoan(Number(b.dataset.returnLoan)));
   document.querySelectorAll('[data-decide]').forEach(b=>b.onclick=()=>decide(Number(b.dataset.decide),b.dataset.status));
   document.querySelectorAll('[data-action="add-book"]').forEach(b=>b.onclick=()=>openModal('book'));
+}
+
+async function deleteBook(id){
+  if(state.role!=='admin')return toast('هذه العملية للمشرف فقط');
+  const book=state.books.find(b=>b.id===id);
+  if(!book)return toast('الكتاب غير موجود');
+  const activeLoan=state.loans.some(l=>l.book_id===id&&!l.returned_at),pendingRequest=state.requests.some(r=>r.book_id===id&&r.status==='pending');
+  if(activeLoan)return toast('لا يمكن حذف الكتاب وهناك نسخة مع طالب');
+  if(pendingRequest)return toast('عالج طلبات هذا الكتاب قبل حذفه');
+  if(!confirm(`هل تريد حذف كتاب «${book.title}» نهائيًا؟`))return;
+  if(supabase){const {error}=await supabase.from('books').delete().eq('id',id);if(error)return toast(error.code==='23503'?'لا يمكن حذف كتاب مرتبط بسجل قراءة سابق':'تعذر حذف الكتاب: '+error.message)}
+  state.books=state.books.filter(b=>b.id!==id);
+  toast('تم حذف الكتاب');renderPage();
 }
 
 function openModal(type,id){state.modal={type,id};shell();if(type==='book')enhanceBookForm(id);if(type==='request')enhanceRequestForm(id)}
