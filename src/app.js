@@ -38,7 +38,7 @@ let state={user:null,role:null,page:'public',books:[],profiles:[],loans:[],reque
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const firstTwoNames=name=>String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).join(' ');
 const weeklyTarget=profile=>Number(profile?.weekly_target??profile?.daily_target??70);
-const riyadhDay=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh'}).format(value instanceof Date?value:new Date(value));
+const riyadhDay=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh'}).format(value==null?new Date():value instanceof Date?value:new Date(value));
 const activeMultiplier=()=>{
   const now=Date.now(),active=state.profiles.filter(p=>p.role==='admin'&&Number(p.points_multiplier)>1&&new Date(p.multiplier_until||0).getTime()>now);
   return active.length?Math.max(...active.map(p=>Number(p.points_multiplier))):1;
