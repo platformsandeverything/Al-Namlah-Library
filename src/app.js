@@ -121,7 +121,7 @@ async function submitModal(e){
       const owned=state.loans.filter(l=>l.student_id===state.user.id&&!l.returned_at).length;
       if(owned>=3)return toast('لديك 3 كتب حاليًا؛ سلّم أحدها للمشرف قبل طلب كتاب جديد');
       const row={student_id:state.user.id,book_id:Number(fd.get('book_id')),note:fd.get('note'),status:'pending',created_at:new Date().toISOString()};
-      if(supabase&&!state.demoMode){const {error}=await supabase.from('book_requests').insert(row);if(error){const message=String(error.message||'');if(message.includes('daily')||message.includes('مرة واحدة')||message.includes('واحد فقط')||message.includes('الحد اليومي'))return toast('وصلت للحد اليومي للطلبات؛ يمكنك طلب كتاب جديد غدًا');return toast('تعذر إرسال الطلب: '+message)}await loadData()}
+      if(supabase&&!state.demoMode){const {error}=await supabase.from('book_requests').insert(row);if(error)return toast('تعذر إرسال الطلب: '+String(error.message||''));await loadData()}
       else{row.id=Date.now();state.requests.unshift(row)}
       toast('تم إرسال طلبك للمشرف');
     }
