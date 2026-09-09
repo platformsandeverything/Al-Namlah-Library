@@ -13,10 +13,10 @@ const demo={
   ],
   profiles:[
     {id:'demo-admin',name:'مشرف المكتبة التجريبي',phone:'0500000000',role:'admin',points:0,weekly_target:70,books_count:0,pages_week:0,must_change_password:false},
-    {id:'s1',name:'عبدالله محمد',role:'student',points:247,weekly_target:100,books_count:2,pages_week:58},
-    {id:'s2',name:'عمر خالد',role:'student',points:231,weekly_target:80,books_count:1,pages_week:44},
-    {id:'s3',name:'سلمان أحمد',role:'student',points:198,weekly_target:70,books_count:2,pages_week:39},
-    {id:'s4',name:'يوسف علي',role:'student',points:176,weekly_target:60,books_count:1,pages_week:35}
+    {id:'s1',name:'عبدالله محمد',role:'student',grade:'third',points:247,weekly_target:100,books_count:2,pages_week:58},
+    {id:'s2',name:'عمر خالد',role:'student',grade:'second',points:231,weekly_target:75,books_count:1,pages_week:44},
+    {id:'s3',name:'سلمان أحمد',role:'student',grade:'first',points:198,weekly_target:50,books_count:2,pages_week:39},
+    {id:'s4',name:'يوسف علي',role:'student',grade:'first',points:176,weekly_target:50,books_count:1,pages_week:35}
   ],
   loans:[
     {id:1,student_id:'s1',book_id:1,pages_read:318,completed_at:null,returned_at:null},
@@ -37,7 +37,9 @@ const demo={
 let state={user:null,role:null,page:'public',books:[],profiles:[],loans:[],requests:[],reviews:[],modal:null,demoMode:false};
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const firstTwoNames=name=>String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).join(' ');
-const weeklyTarget=profile=>Number(profile?.weekly_target??profile?.daily_target??70);
+const gradeLabels={first:'أول متوسط',second:'ثاني متوسط',third:'ثالث متوسط'};
+const gradeTarget=grade=>({first:50,second:75,third:100}[grade]||50);
+const weeklyTarget=profile=>Number(profile?.weekly_target??profile?.daily_target??gradeTarget(profile?.grade));
 const riyadhDay=value=>value==null?`__now__${Date.now()}`:new Date(value).toISOString();
 const activeMultiplier=()=>{
   const now=Date.now(),active=state.profiles.filter(p=>p.role==='admin'&&Number(p.points_multiplier)>1&&new Date(p.multiplier_until||0).getTime()>now);
@@ -170,8 +172,8 @@ async function decide(id,status){const r=state.requests.find(x=>x.id===id),book=
 async function boot(){if(supabase&&!state.demoMode){const {data:{session}}=await supabase.auth.getSession();if(session){const {data:p}=await supabase.from('profiles').select('*').eq('id',session.user.id).single();if(p){state.user=p;state.role=p.role;if(p.must_change_password)return passwordChangeView();await loadData();return render()}}}loginView()}
 boot();
 
-function accountsView(){const users=[...state.profiles].sort((a,b)=>a.name.localeCompare(b.name,'ar')),students=users.filter(p=>p.role==='student').length,admins=users.filter(p=>p.role==='admin').length;return `<div class="hero"><div><h3>حسابات الحلقة</h3><p>أنشئ الحسابات واستعد الوصول للحساب عند نسيان كلمة المرور.</p></div><div class="hero-stats"><div class="hero-stat"><strong>${students}</strong><span>طالب</span></div><div class="hero-stat"><strong>${admins}</strong><span>مشرف</span></div></div></div><div class="section-head"><div><h3>الطلاب والمشرفون</h3><p>الحسابات المسجلة في مكتبة الحلقة</p></div><button class="btn" id="addAccountBtn">＋ إضافة حساب</button></div><div class="table-wrap"><table class="table"><thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدور</th><th>حالة كلمة المرور</th><th>الإجراء</th></tr></thead><tbody>${users.map(p=>`<tr><td><div class="student-cell"><div class="avatar">${esc(p.name[0])}</div><b>${esc(p.name)}</b></div></td><td dir="ltr">${esc(p.phone||'—')}</td><td><span class="status approved">${p.role==='admin'?'مشرف':'طالب'}</span></td><td>${p.must_change_password?'بانتظار تغيير كلمة المرور':'مفعّل'}</td><td>${p.id===state.user.id?'<span class="muted">حسابك الحالي</span>':`<div class="actions"><button class="link-btn" data-reset-account="${p.id}">استعادة كلمة المرور</button><button class="link-btn delete-link" data-delete-account="${p.id}">حذف الحساب</button></div>`}</td></tr>`).join('')}</tbody></table></div>`}
-function bindAccounts(){const b=$('#addAccountBtn');if(b)b.onclick=showAccountModal;document.querySelectorAll('[data-delete-account]').forEach(button=>button.onclick=()=>deleteAccount(button.dataset.deleteAccount));document.querySelectorAll('[data-reset-account]').forEach(button=>button.onclick=()=>resetAccountPassword(button.dataset.resetAccount))}
+function accountsView(){const users=[...state.profiles].sort((a,b)=>a.name.localeCompare(b.name,'ar')),students=users.filter(p=>p.role==='student').length,admins=users.filter(p=>p.role==='admin').length;return `<div class="hero"><div><h3>حسابات الحلقة</h3><p>أنشئ الحسابات وعدّل بيانات الطلاب وصفوفهم.</p></div><div class="hero-stats"><div class="hero-stat"><strong>${students}</strong><span>طالب</span></div><div class="hero-stat"><strong>${admins}</strong><span>مشرف</span></div></div></div><div class="section-head"><div><h3>الطلاب والمشرفون</h3><p>الحسابات المسجلة في مكتبة الحلقة</p></div><button class="btn" id="addAccountBtn">＋ إضافة حساب</button></div><div class="table-wrap"><table class="table"><thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدور</th><th>الصف</th><th>الهدف الأسبوعي</th><th>حالة كلمة المرور</th><th>الإجراء</th></tr></thead><tbody>${users.map(p=>`<tr><td><div class="student-cell"><div class="avatar">${esc(p.name[0])}</div><b>${esc(p.name)}</b></div></td><td dir="ltr">${esc(p.phone||'—')}</td><td><span class="status approved">${p.role==='admin'?'مشرف':'طالب'}</span></td><td>${p.role==='student'?gradeLabels[p.grade]||'غير محدد':'—'}</td><td>${p.role==='student'?`${weeklyTarget(p)} صفحة`:'—'}</td><td>${p.must_change_password?'بانتظار تغيير كلمة المرور':'مفعّل'}</td><td><div class="actions"><button class="link-btn" data-edit-account="${p.id}">تعديل البيانات</button>${p.id===state.user.id?'<span class="muted">حسابك الحالي</span>':`<button class="link-btn" data-reset-account="${p.id}">استعادة كلمة المرور</button><button class="link-btn delete-link" data-delete-account="${p.id}">حذف الحساب</button>`}</div></td></tr>`).join('')}</tbody></table></div>`}
+function bindAccounts(){const b=$('#addAccountBtn');if(b)b.onclick=showAccountModal;document.querySelectorAll('[data-edit-account]').forEach(button=>button.onclick=()=>showEditAccountModal(button.dataset.editAccount));document.querySelectorAll('[data-delete-account]').forEach(button=>button.onclick=()=>deleteAccount(button.dataset.deleteAccount));document.querySelectorAll('[data-reset-account]').forEach(button=>button.onclick=()=>resetAccountPassword(button.dataset.resetAccount))}
 async function resetAccountPassword(id){const profile=state.profiles.find(p=>p.id===id);if(!profile)return toast('الحساب غير موجود');if(supabase&&!state.demoMode){const {data,error}=await supabase.rpc('admin_reset_password',{target_user_id:id});if(error)return toast(error.message||'تعذر استعادة كلمة المرور');showTemporaryPassword(profile,data);await loadData()}else showTemporaryPassword(profile,'Nm!Reset12345')}
 function showTemporaryPassword(profile,password){document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="resetOverlay"><div class="modal"><h3>تم إنشاء كلمة مرور مؤقتة</h3><p>أرسلها إلى ${esc(profile.name)}، وسيُطلب منه تغييرها عند تسجيل الدخول.</p><div class="notice">انسخها الآن؛ لن تظهر مرة أخرى.</div><div class="field"><label>كلمة المرور المؤقتة</label><input dir="ltr" readonly value="${esc(password)}"></div><button class="btn" id="closeReset">تم الحفظ</button></div></div>`);$('#closeReset').onclick=()=>{document.querySelector('#resetOverlay')?.remove();renderPage()}}
 async function deleteAccount(id){
@@ -187,7 +189,10 @@ async function deleteAccount(id){
   state.reviews=state.reviews.filter(r=>r.student_id!==id);
   toast('تم حذف الحساب نهائيًا');renderPage();
 }
-function showAccountModal(){document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="accountOverlay"><form class="modal" id="accountForm"><h3>إضافة حساب جديد</h3><p>اختر الدور وأدخل الاسم ورقم الجوال، وسيُنشأ باسورد مؤقت تلقائيًا.</p><div class="form"><div class="field"><label>الاسم الكامل</label><input name="name" required></div><div class="field"><label>رقم الجوال</label><input name="phone" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" required></div><div class="field"><label>نوع الحساب</label><select name="role" required><option value="student">طالب</option><option value="admin">مشرف</option></select></div><div class="modal-actions"><button type="button" class="btn ghost" id="cancelAccount">إلغاء</button><button class="btn">إنشاء الحساب</button></div></div></form></div>`);$('#cancelAccount').onclick=closeAccountModal;$('#accountOverlay').onclick=e=>{if(e.target.id==='accountOverlay')closeAccountModal()};$('#accountForm').onsubmit=createAccount}
+function gradeField(value='first'){return `<div class="field" id="gradeField"><label>الصف الدراسي</label><select name="grade" required><option value="first" ${value==='first'?'selected':''}>أول متوسط — الهدف 50 صفحة</option><option value="second" ${value==='second'?'selected':''}>ثاني متوسط — الهدف 75 صفحة</option><option value="third" ${value==='third'?'selected':''}>ثالث متوسط — الهدف 100 صفحة</option></select><small>يُضبط الهدف تلقائيًا، ويمكن تعديله لاحقًا من لوحة المتصدرين.</small></div>`}
+function bindAccountRole(form){const role=form.elements.role,field=form.querySelector('#gradeField');const sync=()=>{field.hidden=role.value!=='student';field.querySelector('select').required=role.value==='student'};role.onchange=sync;sync()}
+function showAccountModal(){document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="accountOverlay"><form class="modal" id="accountForm"><h3>إضافة حساب جديد</h3><p>أدخل البيانات، وسيُنشأ باسورد مؤقت تلقائيًا.</p><div class="form"><div class="field"><label>الاسم الكامل</label><input name="name" required></div><div class="field"><label>رقم الجوال</label><input name="phone" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" required></div><div class="field"><label>نوع الحساب</label><select name="role" required><option value="student">طالب</option><option value="admin">مشرف</option></select></div>${gradeField()}<div class="modal-actions"><button type="button" class="btn ghost" id="cancelAccount">إلغاء</button><button class="btn">إنشاء الحساب</button></div></div></form></div>`);$('#cancelAccount').onclick=closeAccountModal;$('#accountOverlay').onclick=e=>{if(e.target.id==='accountOverlay')closeAccountModal()};const form=$('#accountForm');bindAccountRole(form);form.onsubmit=createAccount}
+function showEditAccountModal(id){const p=state.profiles.find(x=>x.id===id);if(!p)return toast('الحساب غير موجود');document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="accountOverlay"><form class="modal" id="editAccountForm"><h3>تعديل بيانات الحساب</h3><p>يمكنك تعديل الاسم ورقم الجوال والدور والصف.</p><div class="form"><div class="field"><label>الاسم الكامل</label><input name="name" value="${esc(p.name)}" required></div><div class="field"><label>رقم الجوال</label><input name="phone" type="tel" inputmode="tel" dir="ltr" value="${esc(p.phone||'')}" required></div><div class="field"><label>نوع الحساب</label><select name="role" required><option value="student" ${p.role==='student'?'selected':''}>طالب</option><option value="admin" ${p.role==='admin'?'selected':''}>مشرف</option></select></div>${gradeField(p.grade||'first')}<div class="modal-actions"><button type="button" class="btn ghost" id="cancelAccount">إلغاء</button><button class="btn">حفظ التعديلات</button></div></div></form></div>`);$('#cancelAccount').onclick=closeAccountModal;$('#accountOverlay').onclick=e=>{if(e.target.id==='accountOverlay')closeAccountModal()};const form=$('#editAccountForm');bindAccountRole(form);form.onsubmit=e=>updateAccount(e,id)}
 function closeAccountModal(){document.querySelector('#accountOverlay')?.remove()}
 async function createAccount(e){
   e.preventDefault();
@@ -198,17 +203,27 @@ async function createAccount(e){
     const {data:{session}}=await supabase.auth.getSession();
     if(!session){button.disabled=false;button.textContent='إنشاء الحساب';return toast('انتهت جلسة الدخول، سجّل الدخول مرة أخرى')}
     ({data,error}=await supabase.functions.invoke('admin-create-user',{headers:{Authorization:`Bearer ${session.access_token}`},body:{name:fd.get('name'),phone:fd.get('phone'),role:fd.get('role')}}));
+    if(!error&&!data?.error&&fd.get('role')==='student'){const gradeResult=await supabase.rpc('admin_set_student_grade',{account_phone:data.phone||fd.get('phone'),new_grade:fd.get('grade')});if(gradeResult.error)error=gradeResult.error}
   }
-  else data={name:fd.get('name'),phone:normalizePhone(fd.get('phone')).replace('+966','0'),role:fd.get('role'),temporary_password:'Nm!Demo12345'};
+  else data={name:fd.get('name'),phone:normalizePhone(fd.get('phone')).replace('+966','0'),role:fd.get('role'),grade:fd.get('role')==='student'?fd.get('grade'):null,temporary_password:'Nm!Demo12345'};
   if(error||data?.error){
     let message=data?.error||'تعذر إنشاء الحساب';
     if(error?.context){try{const details=await error.context.json();message=details?.error||message}catch{}}
     button.disabled=false;button.textContent='إنشاء الحساب';return toast(message);
   }
-  if(state.demoMode)state.profiles.push({id:`demo-${Date.now()}`,name:data.name,phone:data.phone,role:data.role,points:0,pages_week:0,weekly_target:70,must_change_password:true});
+  if(state.demoMode)state.profiles.push({id:`demo-${Date.now()}`,name:data.name,phone:data.phone,role:data.role,grade:data.grade,points:0,pages_week:0,weekly_target:data.role==='student'?gradeTarget(data.grade):null,must_change_password:true});
   await loadData();
   form.innerHTML=`<h3>تم إنشاء الحساب بنجاح</h3><p>أرسل هذه البيانات إلى ${esc(data.name)}. سيُطلب منه تغيير الباسورد عند أول دخول.</p><div class="notice">احفظ الباسورد الآن؛ لن يظهر مرة أخرى.</div><div class="form"><div class="field"><label>رقم الجوال</label><input dir="ltr" readonly value="${esc(data.phone)}"></div><div class="field"><label>الباسورد المؤقت</label><input dir="ltr" readonly value="${esc(data.temporary_password)}"></div><button type="button" class="btn" id="finishAccount">تم الحفظ</button></div>`;
   $('#finishAccount').onclick=()=>{closeAccountModal();renderPage()};
+}
+
+async function updateAccount(e,id){
+  e.preventDefault();const form=e.currentTarget,button=form.querySelector('button:not([type="button"])'),fd=new FormData(form),role=fd.get('role'),grade=role==='student'?fd.get('grade'):null;
+  button.disabled=true;button.textContent='جارٍ الحفظ...';
+  if(supabase&&!state.demoMode){const {error}=await supabase.rpc('admin_update_account',{target_user_id:id,new_name:fd.get('name'),new_phone:fd.get('phone'),new_role:role,new_grade:grade});if(error){button.disabled=false;button.textContent='حفظ التعديلات';return toast(error.message||'تعذر تعديل الحساب')}await loadData()}
+  else{const p=state.profiles.find(x=>x.id===id),gradeChanged=p.grade!==grade;Object.assign(p,{name:fd.get('name'),phone:fd.get('phone'),role,grade});if(role==='student'&&gradeChanged)p.weekly_target=gradeTarget(grade)}
+  if(id===state.user.id){state.user=state.profiles.find(x=>x.id===id)||state.user;state.role=state.user.role}
+  closeAccountModal();toast('تم حفظ بيانات الحساب');shell();
 }
 
 // تقييمات الكتب، تفاصيلها، وتصنيفها وصورها.
